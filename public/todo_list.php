@@ -1,71 +1,57 @@
-<?php  
-// var_dump($_GET);
-// var_dump($_POST);
-// var_dump($_FILES);
+<?  
 
-$filename = "data/list.txt";
-$todo_list = read_file($filename);
+require_once('classes/filestore.php');
+
+// instantiates class
+$file = new Filestore('data/list.txt');
+
+// calls read function within class for $file
+$todo_list = $file->read();
 
 // determines if POST is empty and assigns result to variable
 $empty_check = empty($_POST);
 
-// Read File & explode to array
-function read_file($filename){
-	$todo_array = [];
-	if (is_readable($filename) && filesize($filename) > 0){	
-	    $filesize = filesize($filename);
-	    $handle = fopen($filename, "r");
-	    $file_contents = fread($handle, $filesize);
-	    $todo_array = explode(PHP_EOL, $file_contents);
-	    fclose($handle); 
-		}
-	return $todo_array;
-}	
-
-// Save File - implode array back to string 
-function save_file($todo_list, $filename){
-	if (is_writeable($filename)){
-		$todo_string = implode(PHP_EOL, $todo_list);
-		$handle = fopen($filename, 'w');
-		fwrite($handle, $todo_string);
-		fclose($handle);
-		return;
-	}
-}
 
 // Remove Todo Item
 if (isset($_GET['remove_index'])) {
 	$remove_index = $_GET['remove_index'];
 	unset($todo_list[$remove_index]);
-	save_file($todo_list, $filename);
+	$file->write($todo_list);			// write function within class for $file
+	header('Location: /todo_list.php');
 }
 
 // Add New Item
 if (!$empty_check) {
 	$new_item = $_POST['add_new_item']; // takes the input of POST name/$key and assigns it to variable
+	if (strlen($new_item) > 240 || strlen($new_item) == 0){
+		throw new Exception('New Item must not be empty or exceed 240 characters');
+	} else {
 	$todo_list[] = $new_item;
-	save_file($todo_list, $filename);
+	$file->write($todo_list);
+	header('Location: /todo_list.php');
+	}
 }
 
 // UPLOAD FILE
 // Verify there were uploaded files and no errors
-if (count($_FILES) > 0 && $_FILES['file1']['error'] == 0) {
-    // Set the destination directory for uploads
-    $upload_dir = '/vagrant/sites/todo.dev/public/uploads/';
-    // Grab the filename from the uploaded file by using basename
-    $up_filename = basename($_FILES['file1']['name']);
-    // Create the saved filename using the file's original name and our upload directory
-    $saved_filename = $upload_dir . $up_filename;
-    // Move the file from the temp location to our uploads directory
-    move_uploaded_file($_FILES['file1']['tmp_name'], $saved_filename);
-    // load the new list
-    $uploaded_list = read_file($saved_filename);
+//if ($_FILES)
+	if (count($_FILES) > 0 && $_FILES['file1']['error'] == 0) {
+	    // Set the destination directory for uploads
+	    $upload_dir = '/vagrant/sites/todo.dev/public/uploads/';
+	    // Grab the filename from the uploaded file by using basename
+	    $up_filename = basename($_FILES['file1']['name']);
+	    // Create the saved filename using the file's original name and our upload directory
+	    $saved_filename = $upload_dir . $up_filename;
+	    // Move the file from the temp location to our uploads directory
+	    move_uploaded_file($_FILES['file1']['tmp_name'], $saved_filename);
+	    // load the new list
+	    $uploaded_list = $file->read($saved_filename);
 
-    // merge
-    $todo_list = array_merge($todo_list, $uploaded_list);
+	    // merge
+	    $todo_list = array_merge($todo_list, $uploaded_list);
 
-    save_file($todo_list, $filename);
-}
+	    $file->write($todo_list);
+	}
 
 // SAVE FILE LINK: Check if we saved a file
 if (isset($saved_filename)) {
@@ -78,17 +64,17 @@ if (isset($saved_filename)) {
 <html>
 <head>
 	<title>TODO List</title>
+	<link rel="stylesheet" href="/css/site.css">
+	<link href='http://fonts.googleapis.com/css?family=Raleway' rel='stylesheet' type='text/css'>
 </head>
-<body>
-
-	<h1>TODO List:</h1>
+<body id='container'>
+	<!-- <p><img src="/images/apple_logo.png"/ class='apple_img' opacity></p> -->
+	<h1><img src="/images/apple_logo.png"/ class='apple_img' opacity>iDO List:</h1>
 	<ul>
-		<?php
-		// list each item in the file on the web browser 
-		foreach ($todo_list as $index => $todo_item) {
-			echo "<li>$todo_item <a href=\"todo_list.php?remove_index={$index}\">remove</a></li>";
-		}
-		?>
+		<!-- list each item in the file on the web browser  --> 
+		<? foreach ($todo_list as $index => $todo_item) : ?>
+			<li><?= htmlspecialchars(strip_tags($todo_item)) . " " ?><?= "<a href=\"todo_list.php?remove_index={$index}\">"; ?>remove</a> </li>
+		<? endforeach; ?>
 	</ul>
 	<form method="POST" action="/todo_list.php">
         <p>
@@ -110,5 +96,6 @@ if (isset($saved_filename)) {
 	        <input type="submit" value="upload">
 	    </p>
 	</form>
+	
 </body>
 </html>
